@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Analytics Dashboard</title>
+<style>
+:root{--bg:#f6f7fb;--card:#ffffff;--text:#1b2130;--muted:#65708a;--line:#e3e7f0;--accent:#2563eb;
+--good:#16a34a;--warn:#d97706;--bad:#dc2626;--c1:#2563eb;--c2:#f59e0b;--c3:#10b981;--c4:#ef4444}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--text:#e8ecf5;--muted:#93a0bd;--line:#273049;
+--accent:#6ea0ff;--good:#4ade80;--warn:#fbbf24;--bad:#f87171;--c1:#6ea0ff;--c2:#fbbf24;--c3:#34d399;--c4:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 48px}
+h1{margin:0 0 4px;font-size:26px}
+.sub{color:var(--muted);margin:0 0 22px;font-size:14px}
+h2{font-size:18px;margin:34px 0 12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.kv{font-size:24px;font-weight:700;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.card h3{margin:0 0 4px;font-size:15px}
+.card p{margin:0 0 10px;color:var(--muted);font-size:13px}
+.chart{position:relative;height:290px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600;text-transform:capitalize}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.total td{font-weight:700;border-top:2px solid var(--line)}
+.badge{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--line)}
+.b-Onabovetarget{background:rgba(22,163,74,.18);color:var(--good)}
+.b-Close{background:rgba(217,119,6,.18);color:var(--warn)}
+.b-Belowtarget{background:rgba(220,38,38,.18);color:var(--bad)}
+.b-A{background:rgba(37,99,235,.18);color:var(--accent)}
+.b-B{background:rgba(217,119,6,.18);color:var(--warn)}
+.b-C{background:var(--line);color:var(--muted)}
+footer{margin-top:40px;color:var(--muted);font-size:12px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sales Analytics Dashboard</h1>
+  <p class="sub">Jan 2025 - Sep 2026 | revenue is net of discounts and excludes returned items | built from SQL joins, pivots and window functions</p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Revenue trends</h2>
+  <div class="grid">
+    <div class="card"><h3>Year over year by month</h3><p>Pivot: months as rows, years as columns</p><div class="chart"><canvas id="c_yoy"></canvas></div></div>
+    <div class="card"><h3>Monthly revenue vs 3-month moving average</h3><p>Window function with a rolling frame</p><div class="chart"><canvas id="c_trend"></canvas></div></div>
+  </div>
+
+  <h2>Regions and products</h2>
+  <div class="grid">
+    <div class="card"><h3>Revenue by region and category</h3><p>Stacked view of the pivot below</p><div class="chart"><canvas id="c_region"></canvas></div></div>
+    <div class="card"><h3>Pareto: product revenue share</h3><p>Bars = share of revenue, line = cumulative share (class A is the first 80%)</p><div class="chart"><canvas id="c_pareto"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Pivot: region x category revenue</h3><p>Darker cells = higher revenue</p><div class="scroll" id="t_region"></div></div>
+  <div class="card" style="margin-top:14px"><h3>Pivot: category x quarter revenue</h3><p>Seven quarters as columns</p><div class="scroll" id="t_quarter"></div></div>
+
+  <h2>Customers</h2>
+  <div class="grid">
+    <div class="card"><h3>RFM segments: revenue</h3><p>Customers scored on recency, frequency and monetary value</p><div class="chart"><canvas id="c_rfm"></canvas></div></div>
+    <div class="card"><h3>RFM segment summary</h3><p>&nbsp;</p><div class="scroll" id="t_rfm"></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Cohort retention</h3><p>Customers by first-order month (rows) still buying N months later (columns)</p><div class="scroll" id="t_cohort"></div></div>
+  <div class="card" style="margin-top:14px"><h3>Top customer per region</h3><p>ROW_NUMBER over revenue</p><div class="scroll" id="t_top"></div></div>
+
+  <h2>Team, channels and returns</h2>
+  <div class="grid">
+    <div class="card"><h3>Salesperson attainment vs 2026 target (%)</h3><p>100% means target reached</p><div class="chart"><canvas id="c_att"></canvas></div></div>
+    <div class="card"><h3>Attainment detail</h3><p>&nbsp;</p><div class="scroll" id="t_att"></div></div>
+  </div>
+  <div class="grid" style="margin-top:14px">
+    <div class="card"><h3>Channel x year</h3><p>Orders, revenue and average order value</p><div class="scroll" id="t_channel"></div></div>
+    <div class="card"><h3>Returns by category</h3><p>Items returned and revenue lost</p><div class="scroll" id="t_returns"></div></div>
+  </div>
+
+  <h2>Product insights and data quality</h2>
+  <div class="grid">
+    <div class="card"><h3>Bought together (top 10 pairs)</h3><p>Self-join on order</p><div class="scroll" id="t_basket"></div></div>
+    <div class="card"><h3>Products never sold</h3><p>LEFT JOIN + IS NULL</p><div class="scroll" id="t_unsold"></div></div>
+    <div class="card"><h3>Data-quality checks</h3><p>Every row should show 0 problems</p><div class="scroll" id="t_dq"></div></div>
+  </div>
+
+  <footer>Sample data is randomly generated (fixed seed), so results demonstrate the queries rather than real business findings.</footer>
+</div>
+
+<script>
+const D = {"E1": {"title": "Executive KPIs", "cols": ["net_revenue", "gross_profit", "margin_pct", "orders", "active_customers", "avg_order_value", "return_rate_pct"], "rows": [[104923008.0, 39344743.0, 37.5, 1580, 116, 66407.0, 4.27]]}, "E2": {"title": "Pivot: YoY revenue by month", "cols": ["month", "rev_2025", "rev_2026", "yoy_pct"], "rows": [["01", 5038995.0, 4623988.0, -8.2], ["02", 3381598.0, 3628985.0, 7.3], ["03", 4847378.0, 4488128.0, -7.4], ["04", 4357405.0, 3655645.0, -16.1], ["05", 4458353.0, 4144910.0, -7.0], ["06", 5109673.0, 5476573.0, 7.2], ["07", 4443020.0, 4250498.0, -4.3], ["08", 4838685.0, 8901835.0, 84.0], ["09", 6233475.0, 4780043.0, -23.3]]}, "E3": {"title": "Pivot: Region x Category revenue", "cols": ["region_name", "Electronics", "Furniture", "Stationery", "Clothing", "Total"], "rows": [["East", 15346750.0, 6033125.0, 305140.0, 1290790.0, 22975805.0], ["North", 18796750.0, 5119425.0, 282415.0, 1280870.0, 25479460.0], ["South", 20611850.0, 6979425.0, 340485.0, 1443770.0, 29375530.0], ["West", 18883075.0, 6711350.0, 285488.0, 1212300.0, 27092213.0], ["TOTAL", 73638425.0, 24843325.0, 1213528.0, 5227730.0, 104923008.0]]}, "E4": {"title": "Pivot: Category x Quarter revenue", "cols": ["category_name", "Q1_2025", "Q2_2025", "Q3_2025", "Q4_2025", "Q1_2026", "Q2_2026", "Q3_2026", "Total"], "rows": [["Electronics", 9219575.0, 9482775.0, 11290950.0, 12424650.0, 9142750.0, 8489000.0, 13588725.0, 73638425.0], ["Furniture", 3229975.0, 3616875.0, 3305675.0, 4585350.0, 2787050.0, 4024200.0, 3294200.0, 24843325.0], ["Clothing", 651640.0, 654320.0, 731920.0, 1043280.0, 660720.0, 629010.0, 856840.0, 5227730.0], ["Stationery", 166780.0, 171460.0, 186635.0, 210545.0, 150580.0, 134918.0, 192610.0, 1213528.0]]}, "E5": {"title": "Running total and 3-month moving average", "cols": ["order_month", "revenue", "cumulative_revenue", "moving_avg_3m"], "rows": [["2025-01", 5038995.0, 5038995.0, 5038995.0], ["2025-02", 3381598.0, 8420593.0, 4210296.0], ["2025-03", 4847378.0, 13267970.0, 4422657.0], ["2025-04", 4357405.0, 17625375.0, 4195460.0], ["2025-05", 4458353.0, 22083728.0, 4554378.0], ["2025-06", 5109673.0, 27193400.0, 4641810.0], ["2025-07", 4443020.0, 31636420.0, 4670348.0], ["2025-08", 4838685.0, 36475105.0, 4797126.0], ["2025-09", 6233475.0, 42708580.0, 5171727.0], ["2025-10", 6445653.0, 49154233.0, 5839271.0], ["2025-11", 5502380.0, 54656613.0, 6060503.0], ["2025-12", 6315793.0, 60972405.0, 6087942.0], ["2026-01", 4623988.0, 65596393.0, 5480720.0], ["2026-02", 3628985.0, 69225378.0, 4856255.0], ["2026-03", 4488128.0, 73713505.0, 4247033.0], ["2026-04", 3655645.0, 77369150.0, 3924253.0], ["2026-05", 4144910.0, 81514060.0, 4096228.0], ["2026-06", 5476573.0, 86990633.0, 4425709.0], ["2026-07", 4250498.0, 91241130.0, 4623993.0], ["2026-08", 8901835.0, 100142965.0, 6209635.0], ["2026-09", 4780043.0, 104923008.0, 5977458.0]]}, "E6": {"title": "Pareto ABC product analysis", "cols": ["product_name", "revenue", "share_pct", "cum_share_pct", "abc_class"], "rows": [["Laptop", 51485500.0, 49.1, 49.1, "A"], ["Smartphone", 19108100.0, 18.2, 67.3, "A"], ["Desk", 10954200.0, 10.4, 77.7, "A"], ["Office Chair", 8202925.0, 7.8, 85.5, "A"], ["Bookshelf", 5686200.0, 5.4, 91.0, "B"], ["Headphones", 3044825.0, 2.9, 93.9, "B"], ["Jacket", 2896480.0, 2.8, 96.6, "B"], ["Jeans", 1617570.0, 1.5, 98.2, "C"], ["T-Shirt", 713680.0, 0.7, 98.8, "C"], ["Printer Paper", 595530.0, 0.6, 99.4, "C"], ["Pen Set", 378760.0, 0.4, 99.8, "C"], ["Notebook Pack", 239238.0, 0.2, 100.0, "C"]]}, "E7": {"title": "RFM customer segments", "cols": ["segment", "customers", "avg_recency_days", "avg_orders", "revenue"], "rows": [["Champions", 28, 14.0, 22.8, 42697453.0], ["At Risk (high value)", 25, 61.0, 21.6, 37904233.0], ["Loyal", 23, 14.0, 9.3, 12533128.0], ["Lost", 18, 92.0, 4.7, 5619295.0], ["Needs Attention", 15, 36.0, 5.0, 4977288.0], ["Promising", 7, 13.0, 3.9, 1191613.0]]}, "E8": {"title": "Cohort retention (active customers)", "cols": ["cohort", "month_0", "month_1", "month_2", "month_3", "month_4", "month_5"], "rows": [["2025-01", 6, 6, 6, 6, 5, 6], ["2025-02", 6, 6, 6, 5, 6, 5], ["2025-03", 6, 6, 5, 4, 5, 6], ["2025-04", 6, 6, 5, 4, 5, 2], ["2025-05", 7, 5, 6, 6, 6, 5], ["2025-06", 6, 6, 5, 4, 5, 5], ["2025-07", 7, 5, 6, 3, 6, 5], ["2025-08", 6, 6, 6, 6, 4, 3], ["2025-09", 4, 3, 3, 2, 2, 2], ["2025-10", 9, 4, 8, 5, 4, 4], ["2025-11", 7, 4, 4, 2, 2, 4], ["2025-12", 8, 3, 4, 7, 3, 3], ["2026-01", 4, 2, 2, 2, 1, 0], ["2026-02", 3, 1, 2, 3, 1, 2], ["2026-03", 7, 3, 2, 3, 4, 5], ["2026-04", 4, 3, 0, 0, 2, 0], ["2026-05", 7, 3, 5, 2, 4, 0], ["2026-06", 9, 6, 6, 0, 0, 0], ["2026-07", 4, 2, 3, 0, 0, 0]]}, "E9": {"title": "Market basket: top product pairs", "cols": ["product_1", "product_2", "orders_together"], "rows": [["Desk", "Jeans", 64], ["Laptop", "Pen Set", 58], ["Desk", "Laptop", 56], ["Desk", "Printer Paper", 55], ["Bookshelf", "Headphones", 54], ["Bookshelf", "Office Chair", 54], ["Jeans", "Printer Paper", 54], ["Notebook Pack", "Office Chair", 53], ["Notebook Pack", "Pen Set", 53], ["Jeans", "Pen Set", 52]]}, "E10": {"title": "Salesperson attainment vs target (2026)", "cols": ["salesperson", "revenue", "target", "attainment_pct", "status"], "rows": [["Imran Khan", 6854560.0, 5701000.0, 120.2, "On/above target"], ["Faisal Ahmed", 6252058.0, 5876000.0, 106.4, "On/above target"], ["Ravi Teja", 5628928.0, 5461000.0, 103.1, "On/above target"], ["Naveen Kumar", 5391338.0, 5690000.0, 94.8, "Close"], ["Lavanya Iyer", 5140440.0, 5584000.0, 92.1, "Close"], ["Deepa Nair", 5345958.0, 5857000.0, 91.3, "Close"], ["Sowmya Reddy", 4864238.0, 5872000.0, 82.8, "Below target"], ["Anjali Rao", 4473085.0, 5407000.0, 82.7, "Below target"]]}, "E11": {"title": "Top customer per region", "cols": ["region_name", "customer_id", "customer_name", "segment", "revenue"], "rows": [["West", 1, "Manoj Chowdary", "Online", 4186268.0], ["North", 5, "Meera Sharma", "Corporate", 3191715.0], ["South", 15, "Vikram Varma", "Corporate", 2470725.0], ["East", 22, "Aarav Naidu", "Corporate", 2152528.0]]}, "E12": {"title": "Pivot: Channel x Year", "cols": ["channel", "orders_2025", "orders_2026", "rev_2025", "rev_2026", "avg_order_value"], "rows": [["Online", 462, 325, 29230108.0, 21846795.0, 64901.0], ["Store", 275, 192, 17288808.0, 13630168.0, 66208.0], ["Phone", 206, 120, 14453490.0, 8473640.0, 70329.0]]}, "E13": {"title": "Returns by category", "cols": ["category_name", "items_sold", "items_returned", "return_rate_pct", "revenue_lost"], "rows": [["Electronics", 973, 39, 4.0, 2790750.0], ["Furniture", 1023, 40, 3.9, 1050550.0], ["Clothing", 974, 40, 4.1, 197100.0], ["Stationery", 1059, 53, 5.0, 68258.0]]}, "E14": {"title": "Customers with no orders (LEFT JOIN + IS NULL)", "cols": ["customer_id", "customer_name", "segment", "region_name", "signup_date"], "rows": [[117, "Karthik Varma", "Retail", "North", "2026-06-12"], [118, "Nisha Naidu", "Retail", "East", "2026-06-13"], [119, "Anita Nair", "Retail", "South", "2026-06-24"], [120, "Manoj Gupta", "Corporate", "North", "2026-06-20"]]}, "E15": {"title": "Products never sold (LEFT JOIN + IS NULL)", "cols": ["product_id", "product_name", "category_name", "unit_price"], "rows": [[13, "Smart Watch", "Electronics", 9000.0]]}, "E16": {"title": "Data quality checks", "cols": ["check_name", "problems"], "rows": [["order_items without an order", 0], ["orders without a customer", 0], ["orders before customer signup", 0], ["returns before order date", 0], ["items priced below cost", 0], ["view rows vs order_items mismatch", 0]]}};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const inr = v => Number(v).toLocaleString('en-IN');
+function money(v){
+  if (v >= 1e7) return '₹' + (v / 1e7).toFixed(2) + ' Cr';
+  if (v >= 1e5) return '₹' + (v / 1e5).toFixed(2) + ' L';
+  return '₹' + inr(v);
+}
+const cell = (v, c) => (v === null || v === undefined) ? '–'
+  : (typeof v === 'number' ? (/pct$/.test(c) ? v.toFixed(1) + '%' : inr(v)) : v);
+
+// KPI tiles
+(function(){
+  const cols = D.E1.cols, row = D.E1.rows[0];
+  const label = {net_revenue:'Net revenue', gross_profit:'Gross profit', margin_pct:'Margin', orders:'Orders',
+                 active_customers:'Active customers', avg_order_value:'Avg order value', return_rate_pct:'Return rate'};
+  const fmt = {net_revenue:money, gross_profit:money, avg_order_value:money,
+               margin_pct:v => v.toFixed(1) + '%', return_rate_pct:v => v.toFixed(2) + '%'};
+  document.getElementById('kpis').innerHTML = cols.map((c, i) =>
+    '<div class="kpi"><div class="kl">' + (label[c] || c) + '</div><div class="kv">' + (fmt[c] || inr)(row[i]) + '</div></div>').join('');
+})();
+
+// Tables
+function table(id, qid, o){
+  o = o || {};
+  const cols = D[qid].cols, rows = D[qid].rows, heat = o.heat || [];
+  let lo = Infinity, hi = -Infinity;
+  rows.forEach(r => { if (r[0] === 'TOTAL') return; heat.forEach(j => { lo = Math.min(lo, r[j]); hi = Math.max(hi, r[j]); }); });
+  const head = '<tr>' + cols.map((c, j) => '<th class="' + (rows.length && typeof rows[0][j] === 'number' ? 'n' : '') + '">' + c.replace(/_/g, ' ') + '</th>').join('') + '</tr>';
+  const body = rows.map(r => '<tr class="' + (r[0] === 'TOTAL' ? 'total' : '') + '">' + r.map((v, j) => {
+    let style = '';
+    if (heat.indexOf(j) >= 0 && r[0] !== 'TOTAL' && hi > lo) {
+      style = ' style="background:rgba(37,99,235,' + (((v - lo) / (hi - lo)) * 0.55).toFixed(3) + ')"';
+    }
+    let txt = cell(v, cols[j]);
+    if (cols[j] === 'status' || cols[j] === 'abc_class') {
+      txt = '<span class="badge b-' + String(v).replace(/[^A-Za-z]/g, '') + '">' + v + '</span>';
+    }
+    return '<td class="' + (typeof v === 'number' ? 'n' : '') + '"' + style + '>' + txt + '</td>';
+  }).join('') + '</tr>').join('');
+  document.getElementById(id).innerHTML = rows.length
+    ? '<table><thead>' + head + '</thead><tbody>' + body + '</tbody></table>'
+    : '<p>No rows.</p>';
+}
+table('t_region', 'E3', {heat:[1,2,3,4]});
+table('t_quarter', 'E4', {heat:[1,2,3,4,5,6,7]});
+table('t_rfm', 'E7');
+table('t_cohort', 'E8', {heat:[1,2,3,4,5,6]});
+table('t_top', 'E11');
+table('t_att', 'E10');
+table('t_channel', 'E12');
+table('t_returns', 'E13');
+table('t_basket', 'E9');
+table('t_unsold', 'E15');
+table('t_dq', 'E16');
+
+// Charts
+if (window.Chart) {
+  Chart.defaults.font.family = 'system-ui, sans-serif';
+  Chart.defaults.color = css('--muted');
+  Chart.defaults.borderColor = css('--line');
+  const pal = [css('--c1'), css('--c2'), css('--c3'), css('--c4')];
+  const mk = (id, cfg) => new Chart(document.getElementById(id), cfg);
+  const base = extra => Object.assign({responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}, extra || {});
+  const mill = {title:{display:true, text:'₹ millions'}};
+
+  mk('c_yoy', {type:'bar', data:{
+    labels: D.E2.rows.map(r => MONTHS[+r[0] - 1]),
+    datasets:[{label:'2025', data:D.E2.rows.map(r => r[1] / 1e6), backgroundColor:css('--muted')},
+              {label:'2026', data:D.E2.rows.map(r => r[2] / 1e6), backgroundColor:pal[0]}]},
+    options: base({scales:{y:mill}})});
+
+  mk('c_trend', {type:'line', data:{
+    labels: D.E5.rows.map(r => r[0]),
+    datasets:[{label:'Revenue', data:D.E5.rows.map(r => r[1] / 1e6), borderColor:pal[0], backgroundColor:pal[0], tension:.25},
+              {label:'3-month moving avg', data:D.E5.rows.map(r => r[3] / 1e6), borderColor:pal[1], backgroundColor:pal[1], borderDash:[6, 4], tension:.25}]},
+    options: base({scales:{y:mill}})});
+
+  const reg = D.E3.rows.filter(r => r[0] !== 'TOTAL');
+  mk('c_region', {type:'bar', data:{
+    labels: reg.map(r => r[0]),
+    datasets:[1, 2, 3, 4].map(j => ({label:D.E3.cols[j], data:reg.map(r => r[j] / 1e6), backgroundColor:pal[j - 1]}))},
+    options: base({scales:{x:{stacked:true}, y:Object.assign({stacked:true}, mill)}})});
+
+  const abcColor = {A:pal[0], B:pal[1], C:'#94a3b8'};
+  mk('c_pareto', {data:{
+    labels: D.E6.rows.map(r => r[0]),
+    datasets:[{type:'bar', label:'Share of revenue (%)', data:D.E6.rows.map(r => r[2]), backgroundColor:D.E6.rows.map(r => abcColor[r[4]])},
+              {type:'line', label:'Cumulative share (%)', data:D.E6.rows.map(r => r[3]), borderColor:pal[3], backgroundColor:pal[3], tension:.2}]},
+    options: base({scales:{y:{max:100}}})});
+
+  mk('c_rfm', {type:'bar', data:{
+    labels: D.E7.rows.map(r => r[0]),
+    datasets:[{label:'Revenue (₹ millions)', data:D.E7.rows.map(r => r[4] / 1e6), backgroundColor:pal[2]}]},
+    options: base({indexAxis:'y', plugins:{legend:{display:false}}})});
+
+  const statusColor = {'On/above target':css('--good'), 'Close':css('--warn'), 'Below target':css('--bad')};
+  mk('c_att', {type:'bar', data:{
+    labels: D.E10.rows.map(r => r[0]),
+    datasets:[{label:'Attainment (%)', data:D.E10.rows.map(r => r[3]), backgroundColor:D.E10.rows.map(r => statusColor[r[4]])}]},
+    options: base({indexAxis:'y', plugins:{legend:{display:false}}})});
+}
+</script>
+</body>
+</html>
