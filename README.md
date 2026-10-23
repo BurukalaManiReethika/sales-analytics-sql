@@ -1,33 +1,26 @@
-# Sales Analytics SQL Project
+# Sales Analytics with SQL
 
-Analyze sales data with **JOINs** and **pivot tables** (SQLite; the SQL ports to MySQL/PostgreSQL with minor changes).
+Analyze sales data using **JOINs**, **pivot tables** (conditional aggregation) and **window functions**.
+Built on SQLite; the SQL ports to MySQL/PostgreSQL with minor changes.
 
-## Files
-| File | Purpose |
+| Folder | What it is |
 |---|---|
-| `schema.sql` | 6 tables: regions, categories, customers, products, orders, order_items (+ indexes) |
-| `generate_seed.py` | Creates `seed_data.sql` (40 customers, 12 products, 300 orders, Jan-Sep 2026) |
-| `analysis.sql` | `v_sales` view (6-table join) + 9 reports |
-| `run_project.py` | Builds `sales.db`, runs every report, prints it and saves `results/Q*.csv` |
+| [`basic/`](basic) | Starter project: 6 tables, 9 reports (joins, pivots, window functions) |
+| [`elite/`](elite) | Advanced edition: 9 tables, 16 reports (YoY, RFM, cohorts, Pareto, market basket, targets, data-quality checks) plus a formatted Excel report with charts |
 
-## Run
+## Quick start
+```bash
+git clone <your-repo-url>
+cd sales-analytics-sql/elite
+pip install openpyxl
+python3 run_elite.py        # builds elite.db, prints reports, writes sales_report_elite.xlsx
 ```
-python3 run_project.py
-```
-Or open `sales.db` in any SQLite client and run the queries in `analysis.sql`.
+For the starter project: `cd basic && python3 run_project.py`.
 
-## Reports
-- **Q1-Q2** INNER JOIN: revenue by category, top 5 customers
-- **Q3-Q4** LEFT JOIN + IS NULL: customers with no orders, products never sold
-- **Q5** Pivot: Region x Category revenue (with totals row)
-- **Q6** Pivot: Month x Segment revenue
-- **Q7** Pivot: Category x Quarter units sold
-- **Q8-Q9** Window functions: month-over-month growth, best product per category
+## Highlights (elite)
+- `v_sales` view joining 8 tables with revenue, cost, profit and returned flag
+- Pivots: Region x Category, Category x Quarter, YoY by month, Channel x Year, cohort retention
+- Window functions: running totals, moving averages, ROW_NUMBER, NTILE-based RFM
+- LEFT JOIN anti-joins, self-join market basket, and a data-quality audit
 
-## How the pivot works
-Most SQL engines have no universal PIVOT keyword, so we use conditional aggregation:
-`SUM(CASE WHEN category_name = 'Electronics' THEN net_revenue ELSE 0 END) AS Electronics`
-This works in SQLite, MySQL, PostgreSQL and SQL Server. Add a new column per new category value.
-
-## Use your own data
-Replace the INSERTs in `seed_data.sql` (or load CSVs into the same tables). Keep the table/column names and every query works unchanged.
+The sample data is randomly generated (fixed seed), so results demonstrate the queries rather than real business findings. To use your own data, load it into the same tables.
